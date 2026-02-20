@@ -1,4 +1,13 @@
 import { useState, useEffect } from 'react';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  Link,
+  useNavigate,
+} from 'react-router-dom';
+import Profile from './Profile';
 
 interface User {
   id: number;
@@ -13,48 +22,29 @@ interface FormData {
   confirmPassword?: string;
 }
 
-function App() {
+function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
     password: '',
     confirmPassword: '',
   });
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-
-  // Check if user was already logged in
-  useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      setCurrentUser(JSON.parse(savedUser));
-      setIsLoggedIn(true);
-    }
-  }, []);
+  const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    setError(''); // Clear error on every change
+    setError('');
   };
 
-  // Simple password strength validation
   const validatePassword = (pwd: string): string | null => {
-    if (pwd.length < 8) {
-      return 'Password must be at least 8 characters long';
-    }
-    if (!/[A-Z]/.test(pwd)) {
-      return 'Password must contain at least one uppercase letter';
-    }
-    if (!/[0-9]/.test(pwd)) {
-      return 'Password must contain at least one number';
-    }
-    return null; // valid
+    if (pwd.length < 8) return 'Password must be at least 8 characters long';
+    if (!/[A-Z]/.test(pwd)) return 'At least one uppercase letter';
+    if (!/[0-9]/.test(pwd)) return 'At least one number';
+    return null;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -63,7 +53,6 @@ function App() {
     setError('');
     setSuccessMsg('');
 
-    // Password validation only on registration
     if (!isLogin) {
       const pwdError = validatePassword(formData.password || '');
       if (pwdError) {
@@ -71,7 +60,6 @@ function App() {
         setLoading(false);
         return;
       }
-
       if (formData.password !== formData.confirmPassword) {
         setError('Passwords do not match');
         setLoading(false);
@@ -85,11 +73,7 @@ function App() {
 
     const payload = isLogin
       ? { email: formData.email, password: formData.password }
-      : {
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-        };
+      : { name: formData.name, email: formData.email, password: formData.password };
 
     try {
       const res = await fetch(url, {
@@ -99,17 +83,18 @@ function App() {
       });
 
       const data = await res.json();
-
+      console.log('API Response:', data);  // ← Add this
       if (data.success) {
         if (isLogin) {
+          console.log('Saving user to localStorage:', data.user);  // ← Add this
           localStorage.setItem('user', JSON.stringify(data.user));
-          setCurrentUser(data.user);
-          setIsLoggedIn(true);
-          setSuccessMsg('Welcome back!');
+          console.log('Navigating to /profile');  // ← Add this
+           navigate('/profile', { replace: true });  // use replace to avoid history issues
+
         } else {
-          setSuccessMsg('Registration successful! You can now login.');
+          setSuccessMsg('Registration successful! Please sign in.');
           setIsLogin(true);
-          setFormData({ ...formData, name: '', password: '', confirmPassword: '' });
+          setFormData({ email: formData.email, password: '', confirmPassword: '' });
         }
       } else {
         setError(data.message || 'Something went wrong');
@@ -121,57 +106,28 @@ function App() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    setIsLoggedIn(false);
-    setCurrentUser(null);
-    setSuccessMsg('');
-  };
-
-  if (isLoggedIn && currentUser) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="bg-white p-10 rounded-2xl shadow-xl w-full max-w-md text-center">
-          <h1 className="text-4xl font-bold text-green-600 mb-6">Welcome back!</h1>
-          <div className="mb-8">
-            <p className="text-xl font-medium">{currentUser.name}</p>
-            <p className="text-gray-500">{currentUser.email}</p>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="bg-red-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-red-700 transition"
-          >
-            Logout
-          </button>
-          <p className="mt-6 text-sm text-gray-400">
-            This is your protected dashboard (coming soon: profile, roles, etc.)
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
       <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
         <h1 className="text-3xl font-bold text-center mb-2 text-gray-800">
           {isLogin ? 'Sign In' : 'Create Account'}
         </h1>
-        <p className="text-center text-gray-500 mb-8">Project #1 – Login & Registration</p>
+        <p className="text-center text-gray-500 mb-8">Secure Auth System</p>
 
         {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4 text-sm">{error}</div>}
         {successMsg && <div className="bg-green-100 text-green-700 p-3 rounded mb-4 text-sm">{successMsg}</div>}
 
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* same form fields as before – name, email, password, confirm */}
           {!isLogin && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
               <input
                 type="text"
                 name="name"
-                value={formData.name}
+                value={formData.name || ''}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               />
             </div>
@@ -184,7 +140,7 @@ function App() {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
@@ -196,7 +152,7 @@ function App() {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
@@ -208,16 +164,14 @@ function App() {
                 <input
                   type="password"
                   name="confirmPassword"
-                  value={formData.confirmPassword}
+                  value={formData.confirmPassword || ''}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
               </div>
-
-              {/* Optional: show password requirements as hint */}
-              <div className="text-xs text-gray-500 mt-1">
-                Password must be at least 8 characters, contain 1 uppercase letter and 1 number.
+              <div className="text-xs text-gray-500">
+                At least 8 characters, 1 uppercase, 1 number
               </div>
             </>
           )}
@@ -225,7 +179,7 @@ function App() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-70"
+            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-70"
           >
             {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Sign Up')}
           </button>
@@ -247,6 +201,89 @@ function App() {
         </p>
       </div>
     </div>
+  );
+}
+
+function ProtectedLayout() {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('user');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setCurrentUser(parsed);
+        console.log("User loaded in ProtectedLayout:", parsed);
+      } catch (e) {
+        console.error("Bad user JSON", e);
+      }
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    window.location.href = '/login'; // or use navigate if you prefer
+  };
+
+  // ────────────────────────────────────────────────
+  //  EARLY RETURN IF NO USER → prevents crash
+  // ────────────────────────────────────────────────
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-xl text-gray-600 animate-pulse">
+          Loading user... (or redirecting)
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <nav className="bg-blue-600 text-white p-4 shadow">
+        <div className="max-w-6xl mx-auto flex justify-between items-center">
+          <Link to="/profile" className="text-xl font-bold">
+            My App
+          </Link>
+          <div className="flex items-center space-x-4">
+            {/* Safe access with optional chaining or fallback */}
+            <span>{currentUser?.name ?? 'User'}</span>
+            <button
+              onClick={handleLogout}
+              className="bg-red-600 px-4 py-2 rounded hover:bg-red-700 transition"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main content area – now safe to render */}
+      <div className="p-8 max-w-4xl mx-auto">
+        <h2 className="text-3xl font-bold text-purple-700 mb-6">
+          Welcome, {currentUser.name}!
+        </h2>
+
+        {/* Put the real <Profile /> component here */}
+        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+          <Profile />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+  <Routes>
+    <Route path="/login" element={<AuthPage />} />
+    <Route path="/profile/*" element={<ProtectedLayout />} />
+    <Route path="/" element={<Navigate to="/login" replace />} />
+    {/* Add 404 fallback if you want */}
+    <Route path="*" element={<Navigate to="/login" replace />} />
+  </Routes>
+</Router>
   );
 }
 
