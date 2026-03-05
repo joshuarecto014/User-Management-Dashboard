@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import {
   BrowserRouter as Router,
@@ -6,13 +7,19 @@ import {
   Navigate,
   Link,
   useNavigate,
+  Outlet,
 } from 'react-router-dom';
 import Profile from './Profile';
+import AdminDashboard from './AdminDashboard';
+import ProtectedRoute from './components/ProtectedRoute';
+
 
 interface User {
   id: number;
   name: string;
   email: string;
+  role: 'user' | 'admin';     // ← add this line
+  profile_picture?: string | null;  // optional, good to have if used elsewhere
 }
 
 interface FormData {
@@ -67,6 +74,7 @@ function AuthPage() {
       }
     }
 
+    
     const url = isLogin
       ? 'http://localhost/auth-api/login.php'
       : 'http://localhost/auth-api/register.php';
@@ -240,23 +248,30 @@ function ProtectedLayout() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <nav className="bg-blue-600 text-white p-4 shadow">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <Link to="/profile" className="text-xl font-bold">
-            My App
-          </Link>
-          <div className="flex items-center space-x-4">
-            {/* Safe access with optional chaining or fallback */}
-            <span>{currentUser?.name ?? 'User'}</span>
-            <button
-              onClick={handleLogout}
-              className="bg-red-600 px-4 py-2 rounded hover:bg-red-700 transition"
-            >
-              Logout
-            </button>
+        <nav className="bg-blue-600 text-white p-4 shadow">
+          <div className="max-w-6xl mx-auto flex justify-between items-center">
+            <Link to="/profile" className="text-xl font-bold">
+              My App
+            </Link>
+            <div className="flex items-center space-x-6">
+              <span>{currentUser?.name ?? 'User'}</span>
+              
+              {/* Show Admin link only if role === 'admin' */}
+              {currentUser?.role === 'admin' && (
+                <Link to="/admin" className="hover:underline">
+                  Admin Panel
+                </Link>
+              )}
+              
+              <button
+                onClick={handleLogout}
+                className="bg-red-600 px-4 py-2 rounded hover:bg-red-700"
+              >
+                Logout
+              </button>
+            </div>
           </div>
-        </div>
-      </nav>
+        </nav>
 
       {/* Main content area – now safe to render */}
       <div className="p-8 max-w-4xl mx-auto">
@@ -266,7 +281,7 @@ function ProtectedLayout() {
 
         {/* Put the real <Profile /> component here */}
         <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <Profile />
+          <Outlet />
         </div>
       </div>
     </div>
@@ -277,12 +292,21 @@ function App() {
   return (
     <Router>
   <Routes>
-    <Route path="/login" element={<AuthPage />} />
-    <Route path="/profile/*" element={<ProtectedLayout />} />
-    <Route path="/" element={<Navigate to="/login" replace />} />
-    {/* Add 404 fallback if you want */}
-    <Route path="*" element={<Navigate to="/login" replace />} />
-  </Routes>
+  <Route path="/login" element={<AuthPage />} />
+  
+  {/* Public + user routes */}
+  <Route element={<ProtectedLayout />}>
+    <Route path="/profile" element={<Profile />} />
+    
+    {/* Admin-only routes – protected */}
+    <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+      <Route path="/admin" element={<AdminDashboard />} /> {/* We'll create this next */}
+    </Route>
+  </Route>
+
+  <Route path="/" element={<Navigate to="/login" replace />} />
+  <Route path="*" element={<Navigate to="/login" replace />} />
+</Routes>
 </Router>
   );
 }

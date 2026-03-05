@@ -4,6 +4,7 @@ interface User {
   id: number;
   name: string;
   email: string;
+  role: 'user' | 'admin';  // ← NEW
   profile_picture?: string | null;
 }
 
@@ -47,16 +48,31 @@ function Profile() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+const MAX_FILE_SIZE = 500 * 1024; // 500 KB (you can increase to 800 KB later)
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setProfilePic(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  if (file.size > MAX_FILE_SIZE) {
+    setError(`File too large! Maximum allowed is ${ (MAX_FILE_SIZE / 1024).toFixed(0) } KB. Try a smaller image.`);
+    e.target.value = ''; // clear the input
+    return;
+  }
+
+  if (!file.type.startsWith('image/')) {
+    setError('Only image files are allowed (jpg, png, gif, etc.)');
+    e.target.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    setProfilePic(reader.result as string);
+    setError(''); // clear previous errors
   };
+  reader.readAsDataURL(file);
+};
 
   const handleUpdateProfile = async () => {
     if (!user) return;
@@ -84,12 +100,19 @@ function Profile() {
       } else {
         setError(data.message || 'Update failed');
       }
-    } catch (err) {
-      setError('Server error');
-    } finally {
-      setLoading(false);
-    }
-  };
+    } catch (err: any) {
+        console.error('Update profile error:', err);
+        if (err.message?.includes('413') || err.message?.includes('Payload Too Large')) {
+          setError('Image is too large for the server. Try a file under 300 KB.');
+        } else if (err.message?.includes('CORS')) {
+          setError('Connection issue – check if XAMPP is running and CORS is allowed.');
+        } else {
+          setError('Failed to save profile. Please try again.');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
 
   const validatePassword = (pwd: string): string | null => {
     if (pwd.length < 8) return 'At least 8 characters';
@@ -159,30 +182,29 @@ function Profile() {
           <div className="flex flex-col items-center space-y-4">
             <div className="relative">
               <img
-                src={profilePic || 'https://via.placeholder.com/150?text=You'}
+                src={profilePic || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDE1MCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjE1MCIgaGVpZ2h0PSIxNTAiIGZpbGw9IiNFNUU3RUIiLz48dGV4dCB4PSI1MCIgeT0iNzUiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiM5Q0EzQjMiPk15IEF2YXRhcjwvdGV4dD48L3N2Zz4='}
                 alt="Profile"
                 className="w-32 h-32 rounded-full object-cover border-4 border-blue-200 shadow"
               />
-              <label className="absolute bottom-0 right-0 bg-blue-600 text-white text-xs px-2 py-1 rounded-full cursor-pointer hover:bg-blue-700">
-                Change
+              <label className="absolute bottom-0 right-0 bg-blue-600 text-white text-xs px-3 py-1 rounded-full cursor-pointer hover:bg-blue-700 shadow">
+                Change Photo
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/gif"
                   onChange={handleFileChange}
                   className="hidden"
                 />
               </label>
             </div>
 
-            <div className="w-full max-w-sm">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-              <input
-                type="text"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            {/* Size guidance – always visible */}
+            <p className="text-xs text-gray-500 text-center">
+              Recommended: square image, max 500 KB (small photos work best)
+            </p>
+
+            {error && error.includes('File too large') && (
+              <p className="text-red-600 text-sm">{error}</p>
+            )}
           </div>
 
           {/* Email (read-only) */}
