@@ -12,6 +12,7 @@ import {
 import Profile from './Profile';
 import AdminDashboard from './AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
+import UserDashboard from './UserDashboard';
 
 
 interface User {
@@ -91,15 +92,24 @@ function AuthPage() {
       });
 
       const data = await res.json();
-      console.log('API Response:', data);  // ← Add this
+      console.log('API Response:', data);  
       if (data.success) {
         if (isLogin) {
-          console.log('Saving user to localStorage:', data.user);  // ← Add this
+          console.log('Saving user to localStorage:', data.user);
           localStorage.setItem('user', JSON.stringify(data.user));
-          console.log('Navigating to /profile');  // ← Add this
-           navigate('/profile', { replace: true });  // use replace to avoid history issues
 
+          
+          const userData = data.user;
+        // Smart redirect: Admin → Admin Dashboard, User → User Dashboard
+          if (userData.role === 'admin') {
+            console.log('Admin detected → redirecting to /admin');
+            navigate('/admin', { replace: true });
+          } else {
+            console.log('Normal user → redirecting to /dashboard');
+            navigate('/dashboard', { replace: true });
+          }
         } else {
+          
           setSuccessMsg('Registration successful! Please sign in.');
           setIsLogin(true);
           setFormData({ email: formData.email, password: '', confirmPassword: '' });
@@ -246,26 +256,36 @@ function ProtectedLayout() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-100">
+return (
+  <div className="min-h-screen bg-gray-100">
+    {/* Updated Navbar */}
         <nav className="bg-blue-600 text-white p-4 shadow">
           <div className="max-w-6xl mx-auto flex justify-between items-center">
-            <Link to="/profile" className="text-xl font-bold">
+            {/* "My App" - Smart redirect */}
+            <Link 
+              to={currentUser?.role === 'admin' ? "/admin" : "/dashboard"} 
+              className="text-xl font-bold hover:underline"
+            >
               My App
             </Link>
+
             <div className="flex items-center space-x-6">
-              <span>{currentUser?.name ?? 'User'}</span>
+              {/* Clicking name always goes to Profile */}
+              <Link 
+                to="/profile" 
+                className="hover:underline cursor-pointer font-medium"
+              >
+                {currentUser?.name ?? 'User'}
+              </Link>
               
-              {/* Show Admin link only if role === 'admin' */}
+              {/* Admin Panel - only for admins */}
               {currentUser?.role === 'admin' && (
-                <Link to="/admin" className="hover:underline">
-                  Admin Panel
-                </Link>
+                <span> Admin </span> 
               )}
               
               <button
                 onClick={handleLogout}
-                className="bg-red-600 px-4 py-2 rounded hover:bg-red-700"
+                className="bg-red-600 px-4 py-2 rounded hover:bg-red-700 transition"
               >
                 Logout
               </button>
@@ -273,41 +293,38 @@ function ProtectedLayout() {
           </div>
         </nav>
 
-      {/* Main content area – now safe to render */}
-      <div className="p-8 max-w-4xl mx-auto">
-        <h2 className="text-3xl font-bold text-purple-700 mb-6">
-          Welcome, {currentUser.name}!
-        </h2>
-
-        {/* Put the real <Profile /> component here */}
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <Outlet />
-        </div>
-      </div>
+    {/* Main content area */}
+    <div className="p-8 max-w-6xl mx-auto">
+      <Outlet />
     </div>
-  );
+  </div>
+);
+
 }
 
 function App() {
   return (
     <Router>
-  <Routes>
-  <Route path="/login" element={<AuthPage />} />
-  
-  {/* Public + user routes */}
-  <Route element={<ProtectedLayout />}>
-    <Route path="/profile" element={<Profile />} />
-    
-    {/* Admin-only routes – protected */}
-    <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-      <Route path="/admin" element={<AdminDashboard />} /> {/* We'll create this next */}
-    </Route>
-  </Route>
+      <Routes>
+        <Route path="/login" element={<AuthPage />} />
 
-  <Route path="/" element={<Navigate to="/login" replace />} />
-  <Route path="*" element={<Navigate to="/login" replace />} />
-</Routes>
-</Router>
+        {/* Protected Layout for all logged-in users */}
+        <Route element={<ProtectedLayout />}>
+          <Route path="/profile" element={<Profile />} />
+          
+          {/* User Dashboard */}
+          <Route path="/dashboard" element={<UserDashboard />} />
+          
+          {/* Admin-only routes */}
+          <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+            <Route path="/admin" element={<AdminDashboard />} />
+          </Route>
+        </Route>
+
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </Router>
   );
 }
 
