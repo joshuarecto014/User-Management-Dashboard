@@ -8,6 +8,8 @@ interface User {
   profile_picture?: string | null;
 }
 
+
+
 function Profile() {
   const [user, setUser] = useState<User | null>(null);
   const [editName, setEditName] = useState('');
@@ -19,6 +21,25 @@ function Profile() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const logActivity = async (action: string, details: string) => {
+  if (!user) return;
+  try {
+    await fetch('http://localhost/auth-api/log_activity.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: user.id,
+        user_name: user.name,
+        action,
+        details
+      }),
+    });
+  } catch (err) {
+    console.log('Failed to log activity');
+  }
+
+};
 
   useEffect(() => {
     const saved = localStorage.getItem('user');
@@ -93,6 +114,7 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const data = await res.json();
       if (data.success) {
         setSuccess('Profile updated!');
+        logActivity('PROFILE_UPDATE', `Updated name and/or profile picture`);
         // Update localStorage
         const updatedUser = { ...user, name: editName, profile_picture: profilePic };
         localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -154,6 +176,7 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const data = await res.json();
       if (data.success) {
         setSuccess('Password changed!');
+        logActivity('PASSWORD_CHANGE', 'User changed their password');
         setCurrentPassword('');
         setNewPassword('');
         setConfirmNewPassword('');

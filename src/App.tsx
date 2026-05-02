@@ -13,6 +13,7 @@ import Profile from './Profile';
 import AdminDashboard from './AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import UserDashboard from './UserDashboard';
+import { useAuth } from './contexts/AuthContext';
 
 
 interface User {
@@ -75,7 +76,6 @@ function AuthPage() {
       }
     }
 
-    
     const url = isLogin
       ? 'http://localhost/auth-api/login.php'
       : 'http://localhost/auth-api/register.php';
@@ -92,24 +92,41 @@ function AuthPage() {
       });
 
       const data = await res.json();
-      console.log('API Response:', data);  
+      console.log('API Response:', data);
+
       if (data.success) {
         if (isLogin) {
-          console.log('Saving user to localStorage:', data.user);
-          localStorage.setItem('user', JSON.stringify(data.user));
-
-          
           const userData = data.user;
-        // Smart redirect: Admin → Admin Dashboard, User → User Dashboard
+          console.log('Saving user to localStorage:', userData);
+          localStorage.setItem('user', JSON.stringify(userData));
+
+          // ====================== AUTO LOG LOGIN ======================
+            if (userData.role === 'user') {
+              try {
+              await fetch('http://localhost/auth-api/log_activity.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  user_id: userData.id,
+                  user_name: userData.name,
+                  action: 'LOGIN',
+                  details: 'User logged in successfully'
+                }),
+              });
+              console.log('User login activity logged');
+            } catch (err) {
+              console.log('Failed to log login activity');
+            }
+          }
+          // ============================================================
+
+          // Smart redirect
           if (userData.role === 'admin') {
-            console.log('Admin detected → redirecting to /admin');
             navigate('/admin', { replace: true });
           } else {
-            console.log('Normal user → redirecting to /dashboard');
             navigate('/dashboard', { replace: true });
           }
         } else {
-          
           setSuccessMsg('Registration successful! Please sign in.');
           setIsLogin(true);
           setFormData({ email: formData.email, password: '', confirmPassword: '' });
@@ -240,12 +257,9 @@ function ProtectedLayout() {
 
   const handleLogout = () => {
     localStorage.removeItem('user');
-    window.location.href = '/login'; // or use navigate if you prefer
+    window.location.href = '/login';
   };
 
-  // ────────────────────────────────────────────────
-  //  EARLY RETURN IF NO USER → prevents crash
-  // ────────────────────────────────────────────────
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -256,50 +270,46 @@ function ProtectedLayout() {
     );
   }
 
-return (
-  <div className="min-h-screen bg-gray-100">
-    {/* Updated Navbar */}
-        <nav className="bg-blue-600 text-white p-4 shadow">
-          <div className="max-w-6xl mx-auto flex justify-between items-center">
-            {/* "My App" - Smart redirect */}
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <nav className="bg-blue-600 text-white p-4 shadow">
+        <div className="max-w-6xl mx-auto flex justify-between items-center">
+          <Link 
+            to={currentUser?.role === 'admin' ? "/admin" : "/dashboard"} 
+            className="text-xl font-bold hover:underline"
+          >
+            Dashboard
+          </Link>
+
+          <div className="flex items-center space-x-6">
             <Link 
-              to={currentUser?.role === 'admin' ? "/admin" : "/dashboard"} 
-              className="text-xl font-bold hover:underline"
+              to="/profile" 
+              className="hover:underline cursor-pointer font-medium"
             >
-              My App
+              {currentUser?.name ?? 'User'}
             </Link>
-
-            <div className="flex items-center space-x-6">
-              {/* Clicking name always goes to Profile */}
-              <Link 
-                to="/profile" 
-                className="hover:underline cursor-pointer font-medium"
-              >
-                {currentUser?.name ?? 'User'}
+            
+            {currentUser?.role === 'admin' && (
+              <Link to="/admin" className="hover:underline">
+                Admin Panel
               </Link>
-              
-              {/* Admin Panel - only for admins */}
-              {currentUser?.role === 'admin' && (
-                <span> Admin </span> 
-              )}
-              
-              <button
-                onClick={handleLogout}
-                className="bg-red-600 px-4 py-2 rounded hover:bg-red-700 transition"
-              >
-                Logout
-              </button>
-            </div>
+            )}
+            
+            <button
+              onClick={handleLogout}
+              className="bg-red-600 px-4 py-2 rounded hover:bg-red-700 transition"
+            >
+              Logout
+            </button>
           </div>
-        </nav>
+        </div>
+      </nav>
 
-    {/* Main content area */}
-    <div className="p-8 max-w-6xl mx-auto">
-      <Outlet />
+      <div className="p-8 max-w-6xl mx-auto">
+        <Outlet />
+      </div>
     </div>
-  </div>
-);
-
+  );
 }
 
 function App() {
